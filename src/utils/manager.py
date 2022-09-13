@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2022 Canonical
+# Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 """Set up and manage slurmctld, munge, etc."""
