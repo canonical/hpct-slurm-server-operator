@@ -23,10 +23,6 @@ class SlurmManager:
             "org.freedesktop.systemd1", "/org/freedesktop/systemd1"
         )
         self.manager = dbus.Interface(_systemd, "org.freedesktop.systemd1.Manager")
-        
-        _cache = apt.Cache()
-        _cache.update()
-        self.cache = _cache.open(None)
 
     def install(self, knob: str) -> None:
         """Dispatch for installing charm dependencies.
@@ -36,6 +32,7 @@ class SlurmManager:
                 Options:
                     "slurmctld": SLURM Central Management daemon
         """
+        self.cache = apt.Cache()
         dispatch = {self._SLURMCTLD: self._slurmctld_install}
         dispatch[knob]()
 

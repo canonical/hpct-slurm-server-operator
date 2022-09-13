@@ -17,11 +17,5 @@ parts:
       - cryptography
 
     override-build: |
-      mkdir -p /etc/xdg/pip/
-      cat << EOF > /etc/xdg/pip/pip.conf
-      [global]
-      extra-index-url = http://10.152.28.227:8080
-      trusted-host = 10.152.28.227
-      EOF
       apt-get install -y python3-apt python3-dbus
       craftctl default
