@@ -32,8 +32,12 @@ class SlurmServerCharm(ServiceCharm):
         self.manager.install("slurmctld")
 
     def _service_start(self, event: ActionEvent) -> None:
-        "Fired when server-start action is invoked."
-        pass
+        """Fired when service-start is run."""
+        self.manager.start("slurmctld")
+
+    def _service_stop(self, event: ActionEvent, force: bool) -> None:
+        """Fired when service-stop is run."""
+        self.manager.stop("slurmctld")
         
 
 if __name__ == "__main__":
