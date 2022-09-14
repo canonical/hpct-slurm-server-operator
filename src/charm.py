@@ -41,15 +41,15 @@ class SlurmServerCharm(ServiceCharm):
 
     def _service_install(self, event: InstallEvent) -> None:
         "Fired when charm is first deployed."
-        self.manager.install("slurmctld")
+        self.manager.install()
 
     def _service_start(self, event: ActionEvent) -> None:
         """Fired when service-start is run."""
-        self.manager.start("slurmctld")
+        self.manager.start()
 
     def _service_stop(self, event: ActionEvent, force: bool) -> None:
         """Fired when service-stop is run."""
-        self.manager.stop("slurmctld")
+        self.manager.stop()
         
 
 if __name__ == "__main__":
