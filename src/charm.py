@@ -12,7 +12,7 @@ from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus
 
-from utils import SlurmManager
+from utils import MungeManager, SlurmServerManager
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,19 @@ class SlurmServerCharm(ServiceCharm):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.manager = SlurmManager()
+        self.framework.observe(self.on.auth_start_action, self._auth_start)
+        self.framework.observe(self.on.auth_stop_action, self._auth_stop)
+
+        self.manager = SlurmServerManager()
+        self.auth_manager = MungeManager()
+
+    def _auth_start(self, event: ActionEvent) -> None:
+        """Fired when auth-start is run."""
+        self.auth_manager.start()
+
+    def _auth_stop(self, event: ActionEvent, force: bool) -> None:
+        """Fired when auth-stop is run."""
+        self.auth_manager.stop()
 
     def _service_install(self, event: InstallEvent) -> None:
         "Fired when charm is first deployed."
