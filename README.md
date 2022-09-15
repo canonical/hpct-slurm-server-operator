@@ -2,7 +2,7 @@
 
 ## Description
 
-The HPCT teams slurm server operator. Installs and manages `slurmctld` and `munge` daemon.
+The HPCT team's slurm server operator. Installs and manages `slurmctld` and `munge` daemon.
 
 ## Usage
 
