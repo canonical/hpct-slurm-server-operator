@@ -14,11 +14,10 @@ from charms.operator_libs_linux.v1.systemd import (
     service_stop,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
-class SlurmServerManager: 
+class SlurmServerManager:
     def install(self) -> None:
         """Install SLURM central management daemon."""
         try:
