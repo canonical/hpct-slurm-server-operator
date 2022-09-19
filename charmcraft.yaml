@@ -15,7 +15,3 @@ parts:
   charm:
     charm-binary-python-packages:
       - cryptography
-
-    override-build: |
-      apt-get install -y python3-apt python3-dbus
-      craftctl default

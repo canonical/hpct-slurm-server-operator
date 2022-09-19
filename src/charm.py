@@ -7,12 +7,12 @@
 import logging
 
 from hpctlib.ops.charm.service import ServiceCharm
-from ops.charm import ActionEvent, InstallEvent
+from ops.charm import ActionEvent, InstallEvent, StartEvent, StopEvent
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus
 
-from utils import MungeManager, SlurmServerManager
+from manager import MungeManager, SlurmServerManager
 
 
 logger = logging.getLogger(__name__)
@@ -43,14 +43,14 @@ class SlurmServerCharm(ServiceCharm):
         "Fired when charm is first deployed."
         self.manager.install()
 
-    def _service_start(self, event: ActionEvent) -> None:
+    def _service_start(self, event: StartEvent) -> None:
         """Fired when service-start is run."""
         self.manager.start()
 
-    def _service_stop(self, event: ActionEvent, force: bool) -> None:
+    def _service_stop(self, event: StopEvent, force: bool) -> None:
         """Fired when service-stop is run."""
         self.manager.stop()
-        
+
 
 if __name__ == "__main__":
     main(SlurmServerCharm)
