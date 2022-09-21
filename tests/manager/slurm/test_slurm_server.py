@@ -48,25 +48,25 @@ class TestSlurmServer:
     def test_install(self) -> None:
         """Test install for slurmctld."""
         result = self._run("install.py")
-        assert bool(result.stdout) is True
+        assert int(result.exit_code) == 0
 
     @remote
     def test_start(self) -> None:
         """Test that slurmctld service can start."""
         result = self._run("start.py")
-        assert bool(result.stdout) is True
+        assert int(result.exit_code) == 0
 
     @remote
     def test_stop(self) -> None:
         """Test that slurmctld service can stop."""
         result = self._run("stop.py")
-        assert bool(result.stdout) is True
+        assert int(result.exit_code) == 0
 
     @remote
     def test_restart(self) -> None:
         """Test that slurmctld service can restart."""
         result = self._run("restart.py")
-        assert bool(result.stdout) is True
+        assert int(result.exit_code) == 0
 
     def _run(self, scriptlet: str) -> Tuple:
         """Execute python3 scriptlet inside the LXD test instance.

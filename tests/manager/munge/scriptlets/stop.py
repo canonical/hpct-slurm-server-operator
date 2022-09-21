@@ -4,6 +4,8 @@
 
 """Scriptlet to test stop is working."""
 
+import sys
+
 import charms.operator_libs_linux.v0.apt as apt
 from charms.operator_libs_linux.v1.systemd import service_running
 from munge import MungeManager
@@ -12,8 +14,7 @@ from munge import MungeManager
 def test() -> None:
     # Check munge is installed.
     if not _is_munge_installed():
-        print(False)
-        exit(1)
+        sys.exit(1)
 
     # Stop munge.
     manager = MungeManager()
@@ -21,11 +22,9 @@ def test() -> None:
 
     # Check that service is active.
     if service_running("munge"):
-        print(False)
-        exit(1)
+        sys.exit(1)
     else:
-        print(True)
-        exit(0)
+        sys.exit(0)
 
 
 def _is_munge_installed() -> bool:

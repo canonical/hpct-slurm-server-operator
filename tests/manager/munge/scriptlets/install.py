@@ -4,6 +4,8 @@
 
 """Scriptlet to test install is working."""
 
+import sys
+
 import charms.operator_libs_linux.v0.apt as apt
 from munge import MungeManager
 
@@ -16,9 +18,9 @@ def test() -> None:
     # Test that package is present on system.
     try:
         munge = apt.DebianPackage.from_installed_package("munge")
-        print(True)
+        sys.exit(0)
     except apt.PackageNotFoundError:
-        print(False)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

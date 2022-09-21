@@ -4,6 +4,8 @@
 
 """Scriptlet to test install is working."""
 
+import sys
+
 import charms.operator_libs_linux.v0.apt as apt
 from slurm_server import SlurmServerManager
 
@@ -13,12 +15,12 @@ def test() -> None:
     manager = SlurmServerManager()
     manager.install()
 
-    # Test that package is present on system
+    # Test that package is present on system.
     try:
         slurmctld = apt.DebianPackage.from_installed_package("slurmctld")
-        print(True)
+        sys.exit(0)
     except apt.PackageNotFoundError:
-        print(False)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

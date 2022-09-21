@@ -4,6 +4,8 @@
 
 """Scriptlet to test stop is working."""
 
+import sys
+
 import charms.operator_libs_linux.v0.apt as apt
 from charms.operator_libs_linux.v1.systemd import service_running
 from slurm_server import SlurmServerManager
@@ -11,9 +13,8 @@ from slurm_server import SlurmServerManager
 
 def test() -> None:
     # Check slurmctld is installed.
-    if not _is_slurmctld_installed:
-        print(False)
-        exit(1)
+    if not _is_slurmctld_installed():
+        sys.exit(1)
 
     # Stop slurmctld.
     manager = SlurmServerManager()
@@ -21,11 +22,9 @@ def test() -> None:
 
     # Check that service is active.
     if service_running("slurmctld"):
-        print(False)
-        exit(1)
+        sys.exit(1)
     else:
-        print(True)
-        exit(0)
+        sys.exit(0)
 
 
 def _is_slurmctld_installed() -> bool:
