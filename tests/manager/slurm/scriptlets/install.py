@@ -17,7 +17,7 @@ def test() -> None:
 
     # Test that package is present on system.
     try:
-        slurmctld = apt.DebianPackage.from_installed_package("slurmctld")
+        apt.DebianPackage.from_installed_package("slurmctld")
         sys.exit(0)
     except apt.PackageNotFoundError:
         sys.exit(1)

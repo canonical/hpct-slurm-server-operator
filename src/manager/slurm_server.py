@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 class SlurmServerManager:
+    """Top-level manager class for controlling slurmctld on unit."""
+
     def install(self) -> None:
         """Install SLURM central management daemon."""
         try:

@@ -17,7 +17,7 @@ def test() -> None:
 
     # Test that package is present on system.
     try:
-        munge = apt.DebianPackage.from_installed_package("munge")
+        apt.DebianPackage.from_installed_package("munge")
         sys.exit(0)
     except apt.PackageNotFoundError:
         sys.exit(1)

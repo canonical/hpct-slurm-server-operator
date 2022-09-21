@@ -29,7 +29,7 @@ def test() -> None:
 
 def _is_slurmctld_installed() -> bool:
     try:
-        slurmctld = apt.DebianPackage.from_installed_package("slurmctld")
+        apt.DebianPackage.from_installed_package("slurmctld")
         return True
     except apt.PackageNotFoundError:
         return False

@@ -29,7 +29,7 @@ def test() -> None:
 
 def _is_munge_installed() -> bool:
     try:
-        slurmctld = apt.DebianPackage.from_installed_package("munge")
+        apt.DebianPackage.from_installed_package("munge")
         return True
     except apt.PackageNotFoundError:
         return False

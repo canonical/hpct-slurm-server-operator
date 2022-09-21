@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class SlurmServerCharm(ServiceCharm):
+    """Slurm server charm. Encapsulates slurmctld and munge."""
 
     _stored = StoredState()
 
@@ -47,7 +48,7 @@ class SlurmServerCharm(ServiceCharm):
         self.service_set_status_message("Authentication service is not active.")
 
     def _service_install(self, event: InstallEvent) -> None:
-        "Fired when charm is first deployed."
+        """Fired when charm is first deployed."""
         self.service_set_state("waiting")
         self.service_set_status_message("Installing munge")
         self.auth_manager.install()
