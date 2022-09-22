@@ -1,12 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-auth-start:
-  description: Start node authentication service.
-
-auth-stop:
-  description: Stop node authentication service.
-
 service-restart:
   description: Restart services.
   params:
