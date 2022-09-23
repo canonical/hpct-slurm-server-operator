@@ -1,104 +1,71 @@
 #!/usr/bin/env python3
-# Copyright 2022 Canonical
+# Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-#
-# Learn more at: https://juju.is/docs/sdk
 
-"""Charm the service.
-
-Refer to the following post for a quick-start guide that will help you
-develop a new k8s charm using the Operator Framework:
-
-    https://discourse.charmhub.io/t/4208
-"""
+"""HPC Team SLURM server charm."""
 
 import logging
 
-from ops.charm import CharmBase
-from ops.framework import StoredState
+from hpctlib.misc import service_forced_update
+from hpctlib.ops.charm.service import ServiceCharm
+from ops.charm import InstallEvent, StartEvent, StopEvent
 from ops.main import main
-from ops.model import ActiveStatus
+
+from manager import MungeManager, SlurmServerManager
 
 logger = logging.getLogger(__name__)
 
 
-class SlurmctldOperatorCharm(CharmBase):
-    """Charm the service."""
-
-    _stored = StoredState()
+class SlurmServerCharm(ServiceCharm):
+    """Slurm server charm. Encapsulates slurmctld and munge."""
 
     def __init__(self, *args):
         super().__init__(*args)
-        self.framework.observe(self.on.httpbin_pebble_ready, self._on_httpbin_pebble_ready)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
-        self.framework.observe(self.on.fortune_action, self._on_fortune_action)
-        self._stored.set_default(things=[])
+        self.slurm_server_manager = SlurmServerManager()
+        self.munge_manager = MungeManager()
 
-    def _on_httpbin_pebble_ready(self, event):
-        """Define and start a workload using the Pebble API.
+    @service_forced_update()
+    def _service_install(self, event: InstallEvent) -> None:
+        """Fired when charm is first deployed."""
+        self.service_set_status_message("Installing munge")
+        self.service_update_status()
+        self.munge_manager.install()
 
-        TEMPLATE-TODO: change this example to suit your needs.
-        You'll need to specify the right entrypoint and environment
-        configuration for your specific workload. Tip: you can see the
-        standard entrypoint of an existing container using docker inspect
+        self.service_set_status_message("Installing slurmctld")
+        self.service_update_status()
+        self.slurm_server_manager.install()
 
-        Learn more about Pebble layers at https://github.com/canonical/pebble
-        """
-        # Get a reference the container attribute on the PebbleReadyEvent
-        container = event.workload
-        # Define an initial Pebble layer configuration
-        pebble_layer = {
-            "summary": "httpbin layer",
-            "description": "pebble config layer for httpbin",
-            "services": {
-                "httpbin": {
-                    "override": "replace",
-                    "summary": "httpbin",
-                    "command": "gunicorn -b 0.0.0.0:80 httpbin:app -k gevent",
-                    "startup": "enabled",
-                    "environment": {"thing": self.model.config["thing"]},
-                }
-            },
-        }
-        # Add initial Pebble config layer using the Pebble API
-        container.add_layer("httpbin", pebble_layer, combine=True)
-        # Autostart any services that were defined with startup: enabled
-        container.autostart()
-        # Learn more about statuses in the SDK docs:
-        # https://juju.is/docs/sdk/constructs#heading--statuses
-        self.unit.status = ActiveStatus()
+        self.service_set_status_message()
+        self.service_update_status()
 
-    def _on_config_changed(self, _):
-        """Just an example to show how to deal with changed configuration.
+    @service_forced_update()
+    def _service_start(self, event: StartEvent) -> None:
+        """Fired when service-start is run."""
+        self.service_set_status_message("Starting munge")
+        self.service_update_status()
+        self.munge_manager.start()
 
-        TEMPLATE-TODO: change this example to suit your needs.
-        If you don't need to handle config, you can remove this method,
-        the hook created in __init__.py for it, the corresponding test,
-        and the config.py file.
+        self.service_set_status_message("Starting slurmctld")
+        self.service_update_status()
+        self.slurm_server_manager.start()
 
-        Learn more about config at https://juju.is/docs/sdk/config
-        """
-        current = self.config["thing"]
-        if current not in self._stored.things:
-            logger.debug("found a new thing: %r", current)
-            self._stored.things.append(current)
+        self.service_set_status_message()
+        self.service_update_status()
 
-    def _on_fortune_action(self, event):
-        """Just an example to show how to receive actions.
+    @service_forced_update()
+    def _service_stop(self, event: StopEvent, force: bool) -> None:
+        """Fired when service-stop is run."""
+        self.service_set_status_message("Stopping slurmctld")
+        self.service_update_status()
+        self.slurm_server_manager.stop()
 
-        TEMPLATE-TODO: change this example to suit your needs.
-        If you don't need to handle actions, you can remove this method,
-        the hook created in __init__.py for it, the corresponding test,
-        and the actions.py file.
+        self.service_set_status_message("Stopping munge")
+        self.service_update_status()
+        self.munge_manager.stop()
 
-        Learn more about actions at https://juju.is/docs/sdk/actions
-        """
-        fail = event.params["fail"]
-        if fail:
-            event.fail(fail)
-        else:
-            event.set_results({"fortune": "A bug in the code is worth two in the documentation."})
+        self.service_set_status_message("Slurm server is not active.")
+        self.service_update_status()
 
 
 if __name__ == "__main__":
-    main(SlurmctldOperatorCharm)
+    main(SlurmServerCharm)

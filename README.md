@@ -1,21 +1,28 @@
-# slurmctld-operator
+# hpct-slurm-server-operator
 
 ## Description
 
-TODO: Describe your charm in a few paragraphs of Markdown
+A subordinate charm that installs and manages `slurmctld` and `munge` daemons on a principal charm.
 
 ## Usage
 
-TODO: Provide high-level usage, such as required config or relations
+> See internal xwiki article [here](https://hpc4can.ddns.net/xwiki/bin/view/Users/nuccitheboss/Nucci's%20Howtos/Setup%20HPC%20cluster%20with%20hpct%20charms/).
 
+To deploy:
+
+```
+juju deploy ./hpct-slurm-server-operator_ubuntu-22.04-amd64.charm
+```
+
+Assuming a `hpct-xxx-principal-operator` has been deployed:
+
+```
+juju relate hpct-slurm-server-operator hpct-xxx-principal-operator
+```
 
 ## Relations
 
-TODO: Provide any relations which are provided or required by your charm
-
-## OCI Images
-
-TODO: Include a link to the default image your charm uses
+`slurm-server-ready` - a requires relation used to connect to a principal charm that provides the relation.
 
 ## Contributing
 
