@@ -14,7 +14,17 @@ maintainers:
 
 subordinate: true
 
+provides:
+  auth-munge:
+    interface: auth-munge
+
+  slurm-controller:
+    interface: controller
+
 requires:
+  slurm-compute:
+    interface: compute
+
   slurm-server-ready:
     interface: subordinate-ready
     scope: container
