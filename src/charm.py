@@ -6,11 +6,23 @@
 
 import logging
 
-from hpctlib.misc import service_forced_update
-from hpctlib.ops.charm.service import ServiceCharm
-from ops.charm import InstallEvent, StartEvent, StopEvent
+from hpctinterfaces import interface_registry
+from hpctops.charm.service import ServiceCharm
+from hpctops.misc import service_forced_update
+from ops.charm import (
+    InstallEvent,
+    RelationChangedEvent,
+    RelationJoinedEvent,
+    StartEvent,
+    StopEvent,
+)
 from ops.main import main
 
+from interface import (
+    AuthMungeInterface,
+    SlurmComputeInterface,
+    SlurmControllerInterface,
+)
 from manager import MungeManager, SlurmServerManager
 
 logger = logging.getLogger(__name__)
@@ -19,10 +31,25 @@ logger = logging.getLogger(__name__)
 class SlurmServerCharm(ServiceCharm):
     """Slurm server charm. Encapsulates slurmctld and munge."""
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         super().__init__(*args)
+
         self.slurm_server_manager = SlurmServerManager()
         self.munge_manager = MungeManager()
+
+        self.auth_munge_interface = interface_registry.load(
+            "relation-auth-munge", self, "auth-munge"
+        )
+
+        self.framework.observe(
+            self.on.auth_munge_relation_joined, self._auth_munge_relation_joined
+        )
+        self.framework.observe(
+            self.on.slurm_compute_relation_changed, self._slurm_compute_relation_changed
+        )
+        self.framework.observe(
+            self.on.slurm_controller_relation_joined, self._slurm_controller_relation_joined
+        )
 
     @service_forced_update()
     def _service_install(self, event: InstallEvent) -> None:
@@ -66,6 +93,29 @@ class SlurmServerCharm(ServiceCharm):
         self.service_set_status_message("Slurm server is not active.")
         self.service_update_status()
 
+    @service_forced_update()
+    def _auth_munge_relation_joined(self, event: RelationJoinedEvent) -> None:
+        if self.unit.is_leader():
+            self.service_set_status_message("Authenticating new compute node")
+            self.service_update_status()
+            i = self.auth_munge_interface.select(self.app)
+
+            i.nonce = self.munge_manager.hash
+            i.munge_key.load(self.munge_manager.key, checksum=True)
+            self.service_set_status_message("Copy of munge key sent")
+            self.service_update_status()
+
+    @service_forced_update()
+    def _slurm_compute_relation_changed(self, event: RelationChangedEvent) -> None:
+        pass
+
+    @service_forced_update()
+    def _slurm_controller_relation_joined(self, event: RelationJoinedEvent) -> None:
+        pass
+
 
 if __name__ == "__main__":
+    interface_registry.register("relation-auth-munge", AuthMungeInterface)
+    interface_registry.register("relation-slurm-compute", SlurmComputeInterface)
+    interface_registry.register("relation-slurm-controller", SlurmControllerInterface)
     main(SlurmServerCharm)
