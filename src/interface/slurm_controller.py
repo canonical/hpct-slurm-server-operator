@@ -8,6 +8,7 @@ from hpctinterfaces.ext.file import FileDataInterface
 from hpctinterfaces.relation import AppBucketInterface, RelationSuperInterface
 from hpctinterfaces.value import String
 
+
 class SlurmControllerInterface(RelationSuperInterface):
     """Super interface for the slurm-controller relation."""
 
@@ -19,5 +20,5 @@ class SlurmControllerInterface(RelationSuperInterface):
     class SlurmControllerAppInterface(AppBucketInterface):
         """Used by slurm-server leader to set the global slurm.conf file."""
 
-        slurm_conf_hash = String()
+        nonce = String("")
         slurm_conf = FileDataInterface()
