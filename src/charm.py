@@ -5,6 +5,7 @@
 """HPC Team SLURM server charm."""
 
 import logging
+import secrets
 
 from hpctinterfaces import interface_registry
 from hpctops.charm.service import ServiceCharm
@@ -40,6 +41,12 @@ class SlurmServerCharm(ServiceCharm):
         self.auth_munge_interface = interface_registry.load(
             "relation-auth-munge", self, "auth-munge"
         )
+        self.slurm_compute_interface = interface_registry.load(
+            "relation-slurm-compute", self, "slurm-compute"
+        )
+        self.slurm_controller_interface = interface_registry.load(
+            "relation-slurm-controller", self, "slurm-controller"
+        )
 
         self.framework.observe(
             self.on.auth_munge_relation_joined, self._auth_munge_relation_joined
@@ -61,6 +68,7 @@ class SlurmServerCharm(ServiceCharm):
         self.service_set_status_message("Installing slurmctld")
         self.service_update_status()
         self.slurm_server_manager.install()
+        self.slurm_server_manager.generate_new_conf()
 
         self.service_set_status_message()
         self.service_update_status()
@@ -100,18 +108,54 @@ class SlurmServerCharm(ServiceCharm):
             self.service_update_status()
             i = self.auth_munge_interface.select(self.app)
 
-            i.nonce = self.munge_manager.hash
+            i.nonce = self.__create_nonce()
             i.munge_key.load(self.munge_manager.key, checksum=True)
             self.service_set_status_message("Copy of munge key sent")
             self.service_update_status()
 
     @service_forced_update()
     def _slurm_compute_relation_changed(self, event: RelationChangedEvent) -> None:
-        pass
+        """Fired when compute node joins the cluster. Information is loaded from `event.unit`."""
+        i = self.slurm_compute_interface.select(event.unit)
+
+        if i.nonce == "":
+            self.service_set_status_message("Compute node is not ready yet")
+            self.service_update_status()
+        elif self.unit.is_leader():
+            self.service_set_status_message("Registering new compute node")
+            self.service_update_status()
+            if self.slurm_server_manager.running:
+                self.slurm_server_manager.stop()
+            self.slurm_server_manager.add_node(
+                nodename=i.hostname,
+                nodeaddr=i.ip_address,
+                cpus=i.cpu_count,
+                realmemory=i.free_memory,
+            )
+            self.slurm_server_manager.generate_base_partition()
+            self.slurm_server_manager.start()
+
+            out = self.slurm_controller_interface.select(self.app)
+            out.slurm_conf.load(self.slurm_server_manager.conf_file, checksum=True)
+        else:
+            self.service_set_status_message("Leader registering new compute node")
+            self.service_update_status()
 
     @service_forced_update()
     def _slurm_controller_relation_joined(self, event: RelationJoinedEvent) -> None:
-        pass
+        """Fired when new compute node is requesting slurm configuration."""
+        if self.unit.is_leader():
+            i = self.slurm_controller_interface.select(self.app)
+            i.nonce = self.__create_nonce()
+            i.slurm_conf.load(self.slurm_server_manager.conf_file, checksum=True)
+
+    def __create_nonce(self) -> str:
+        """Create a nonce.
+
+        Returns:
+            str: Created nonce.
+        """
+        return secrets.token_urlsafe()
 
 
 if __name__ == "__main__":
