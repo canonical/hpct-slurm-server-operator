@@ -124,8 +124,7 @@ class SlurmServerCharm(ServiceCharm):
         elif self.unit.is_leader():
             self.service_set_status_message("Registering new compute node")
             self.service_update_status()
-            if self.slurm_server_manager.running:
-                self.slurm_server_manager.stop()
+            self.slurm_server_manager.stop()
             self.slurm_server_manager.add_node(
                 nodename=i.hostname,
                 nodeaddr=i.ip_address,

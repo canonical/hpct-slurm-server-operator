@@ -5,9 +5,9 @@
 """Set up and manage slurmctld."""
 
 import hashlib
-import ipaddress
 import logging
 import os
+from typing import Union
 
 import charms.operator_libs_linux.v0.apt as apt
 from charms.operator_libs_linux.v1.systemd import (
@@ -22,47 +22,10 @@ from sysprober.network import Network
 logger = logging.getLogger(__name__)
 
 
-class InvalidNodeConfError(Exception):
-    """Raised when an invalid node configuration is received."""
+class SlurmServerManagerError(Exception):
+    """Raised when the slurm server manager encounters an error."""
 
-    def __init__(self, value: object, desc: str = "Invalid value:") -> None:
-        self.value = value
-        self.desc = desc
-        super().__init__(self.desc)
-
-    def __str__(self) -> str:
-        """String representation of InvalidNodeConfError."""
-        return f"{self.desc} {self.value}"
-
-
-class SlurmctldNotFoundError(Exception):
-    """Raised when trying to perform an operation with slurmctld but slurmctld is not installed."""
-
-    def __init__(self, name: str, desc: str = "Slurmctld is not installed.") -> None:
-        self.name = name
-        self.desc = desc
-        super().__init__(self.desc)
-
-    def __str__(self) -> str:
-        """String representation of SlurmctldNotFoundError."""
-        return f"{self.desc} Please install slurmctld using {self.name}.install()."
-
-
-class SlurmConfNotFoundError(Exception):
-    """Raised when manager cannot locate the `slurm.conf` file on a unit."""
-
-    def __init__(self, path: str, name: str, desc: str = "slurm.conf not found on host.") -> None:
-        self.path = path
-        self.name = name
-        self.desc = desc
-        super().__init__(self.desc)
-
-    def __str__(self) -> str:
-        """String representation of SlurmConfNotFoundError."""
-        return (
-            f"{self.desc} Location searched: {self.path}. "
-            f"Generate a new slurm.conf with {self.name}.generate_new_conf()."
-        )
+    ...
 
 
 class SlurmServerManager:
@@ -71,67 +34,35 @@ class SlurmServerManager:
     def __init__(self) -> None:
         self.__network = Network()
 
-    @property
-    def installed(self) -> bool:
-        """Installation status of slurmctld.
+        self.conf_file = "/etc/slurm/slurm.conf"
+        self.hostname = self.__network.info["hostname"]
+        for iface in self.__network.info["ifaces"]:
+            if iface["name"] == "eth0":
+                for addr in iface["info"]["addr_info"]:
+                    if addr["family"] == "inet":
+                        self.ipv4_address = addr["address"]
+
+    def get_hash(self, file: Union[str, None] = None) -> Union[str, None]:
+        """Get the sha224 hash of a file.
+
+        Args:
+            str | None: File to hash. Defaults to self.conf_file if file is None.
 
         Returns:
-            bool: True if slurmctld is installed on unit;
-            False if slurmctld is not installed on unit.
+            str: sha224 hash of the file, or None if file does not exist.
         """
-        return self.__is_installed()
-
-    @property
-    def running(self) -> bool:
-        """Status of slurmctld daemon.
-
-        Returns:
-            bool: True if slurmctld daemon is running;
-            False if slurmctld daemon is not running.
-        """
-        return service_running("slurmctld")
-
-    @property
-    def hash(self) -> str:
-        """sha224 hash of `slurm.conf`.
-
-        Raises:
-            SlurmConfNotFoundError: Thrown if `/etc/slurm/slurm.conf` does not exist on unit.
-
-        Returns:
-            str: sha224 hash of `slurm.conf`.
-        """
-        if os.path.isfile("/etc/slurm/slurm.conf"):
-            sha224 = hashlib.sha224()
-            sha224.update(open("/etc/munge/munge.key", "rb").read())
-            return sha224.hexdigest()
-        else:
-            raise SlurmConfNotFoundError("/etc/slurm/slurm.conf", self.__class__.__name__)
-
-    @property
-    def conf_file(self) -> str:
-        """Location of slurm configuration file on unit.
-
-        Raises:
-            SlurmConfNotFoundError: Thrown if `/etc/slurm/slurm.conf` does not exist on unit.
-
-        Returns:
-            str: Path to slurm configuration file on unit.
-        """
-        if os.path.isfile("/etc/slurm/slurm.conf"):
-            return "/etc/slurm/slurm.conf"
-        else:
-            raise SlurmConfNotFoundError("/etc/slurm/slurm.conf", self.__class__.__name__)
+        file = self.conf_file if file is None else file
+        return (
+            hashlib.sha224(open(file, "rb").read()).hexdigest() if os.path.isfile(file) else None
+        )
 
     def generate_new_conf(self) -> None:
         """Generate a base configuration file for slurm."""
-        if os.path.isfile("/etc/slurm/slurm.conf"):
-            os.remove("/etc/slurm/slurm.conf")
         open("/etc/slurm/slurm.conf", "w").close()
         editor = SlurmConfFileEditor()
         editor.load()
         content = [
-            f"SlurmctldHost={self.__get_hostname()}({self.__get_ipv4_address()})",
+            f"SlurmctldHost={self.hostname}({self.ipv4_address})",
             "ClusterName=base",
             "AuthType=auth/munge",
             "FirstJobId=65536",
@@ -159,7 +90,7 @@ class SlurmServerManager:
 
     def generate_base_partition(self) -> None:
         """Generation a base partition using automatically discovered nodes."""
-        conf = [line.strip() for line in open("/etc/slurm/slurm.conf")]
+        conf = [line.strip() for line in open(self.conf_file)]
 
         node_list = set()
         for entry in conf:
@@ -176,17 +107,24 @@ class SlurmServerManager:
             f"PartitionName=base Nodes={','.join(node_list)} MaxNodes={len(node_list)} State=UP"
         )
 
-        with open("/etc/slurm/slurm.conf", "wt") as fout:
-            for line in conf:
-                fout.write(f"{line}\n")
+        open(self.conf_file, "w").close()
+        editor = SlurmConfFileEditor()
+        editor.load()
+        editor.add_lines(conf)
+        editor.dump()
 
     def add_node(self, **kwargs) -> None:
-        """Add a new node to the slurm configuration file."""
+        """Add a new node to the slurm configuration file.
+
+        Raises:
+            SlurmServerManagerError: Thrown if a bad configuration is received from a node.
+        """
         nodename = kwargs.get("nodename", None)
         nodeaddr = kwargs.get("nodeaddr", None)
         cpus = kwargs.get("cpus", None)
         realmemory = kwargs.get("realmemory", None)
-        self.__lint_node_conf(nodename, nodeaddr, cpus, realmemory)
+        if None in [nodename, nodeaddr, cpus, realmemory]:
+            raise SlurmServerManagerError("Invalid node configuration received.")
 
         editor = SlurmConfFileEditor()
         editor.load()
@@ -196,19 +134,29 @@ class SlurmServerManager:
         editor.dump()
 
     def install(self) -> None:
-        """Install SLURM central management daemon."""
+        """Install SLURM central management daemon.
+
+        Raises:
+            SlurmServerManagerError: Thrown if slurmctld fails to install.
+        """
         try:
             logger.debug("Installing SLURM Central Management Daemon (slurmctld).")
             apt.add_package("slurmctld")
         except apt.PackageNotFoundError:
             logger.error("Could not install slurmctld. Not found in package cache.")
+            raise SlurmServerManagerError("Failed to install slurmctld.")
         except apt.PackageError as e:
             logger.error(f"Could not install slurmctld. Reason: {e.message}.")
+            raise SlurmServerManagerError("Failed to install slurmctld.")
         finally:
             logger.debug("slurmctld installed.")
 
     def start(self) -> None:
-        """Start SLURM central management daemon."""
+        """Start SLURM central management daemon.
+
+        Raises:
+            SlurmServerManagerError: Thrown if slurmctld is not installed on unit.
+        """
         if self.__is_installed():
             logger.debug("Starting slurmctld service.")
             if not service_running("slurmctld"):
@@ -217,10 +165,14 @@ class SlurmServerManager:
             else:
                 logger.debug("slurmctld service is already running.")
         else:
-            raise SlurmctldNotFoundError(self.__class__.__name__)
+            raise SlurmServerManagerError("slurmctld is not installed.")
 
     def stop(self) -> None:
-        """Stop SLURM central management daemon."""
+        """Stop SLURM central management daemon.
+
+        Raises:
+            SlurmServerManagerError: Thrown if slurmctld is not installed on unit.
+        """
         if self.__is_installed():
             logger.debug("Stopping slurmctld service.")
             if service_running("slurmctld"):
@@ -229,16 +181,20 @@ class SlurmServerManager:
             else:
                 logger.debug("slurmctld service is already stopped.")
         else:
-            raise SlurmctldNotFoundError(self.__class__.__name__)
+            raise SlurmServerManagerError("slurmctld is not installed.")
 
     def restart(self) -> None:
-        """Restart SLURM central management daemon."""
+        """Restart SLURM central management daemon.
+
+        Raises:
+            SlurmServerManagerError: Thrown if slurmctld is not installed on unit.
+        """
         if self.__is_installed():
             logger.debug("Restarting slurmctld service.")
             service_restart("slurmctld")
             logger.debug("slurmctld service restarted.")
         else:
-            raise SlurmctldNotFoundError(self.__class__.__name__)
+            raise SlurmServerManagerError("slurmctld is not installed.")
 
     def __is_installed(self) -> bool:
         """Internal function to check if slurmctld Debian package is installed on the unit.
@@ -246,41 +202,4 @@ class SlurmServerManager:
         Returns:
             bool: True if Debian package is present; False if Debian package is not present.
         """
-        try:
-            slurmctld_status = apt.DebianPackage.from_installed_package("slurmctld")
-            if slurmctld_status.present:
-                return True
-            else:
-                return False
-        except apt.PackageNotFoundError:
-            return False
-
-    def __get_hostname(self) -> str:
-        """Internal function to retrieve hostname of unit.
-
-        Returns:
-            str: Hostname of unit.
-        """
-        return self.__network.info["hostname"]
-
-    def __get_ipv4_address(self) -> ipaddress.IPv4Address:
-        """Internal function to retrieve IPv4 address of unit's eth0 interface.
-
-        Returns:
-            ipaddress.IPv4Address: IPv4 address of unit's eth0 interface.
-        """
-        for iface in self.__network.info["ifaces"]:
-            if iface["name"] == "eth0":
-                for addr in iface["info"]["addr_info"]:
-                    if addr["family"] == "inet":
-                        return addr["address"]
-
-    def __lint_node_conf(self, *args) -> None:
-        """Internal function to lint received compute node configuration.
-
-        Raises:
-            InvalidNodeConfError: Thrown if configuration value is missing.
-        """
-        for arg in args:
-            if arg is None:
-                raise InvalidNodeConfError(arg)
+        return True if apt.DebianPackage.from_installed_package("slurmctld").present else False
