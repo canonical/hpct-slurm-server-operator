@@ -4,9 +4,12 @@
 
 """Set up and manage munge."""
 
+import grp
 import hashlib
 import logging
 import os
+import pathlib
+import pwd
 import subprocess
 from typing import Union
 
@@ -64,19 +67,39 @@ class MungeManager:
         else:
             raise MungeManagerError("Munge is not installed.")
 
-    def write_new_key(self, file: FileDataInterface) -> None:
+    def write_new_key(
+        self,
+        data: bytes,
+        path: Union[str, None] = None,
+        mode: Union[int, None] = None,
+        user: Union[str, None] = None,
+        group: Union[str, None] = None,
+    ) -> None:
         """Write a new munge key.
 
         Args:
-            file (FileDataInterface): `munge.key` file received from event app.
+            data (bytes): Munge key file.
+            path (str | None): Path to write configuration file. Defaults to self.key.
+            mode (int | None): File access mode. Defaults to None.
+            user (str | None) : User to own file. Defaults to None.
+            group (str | None): Group to own file. Defaults to None.
 
         Raises:
             MungeManagerError: Thrown if munge is not installed on unit.
-        """
+        """        
         if self.__is_installed():
             logger.debug("Stopping munge daemon to set new munge key.")
             self.stop()
-            file.save(file.path, update_mode=True, update_owner=True)
+            path = self.key if path is None else path
+            p = pathlib.Path(path)
+            p.touch()
+            uid = pwd.getpwnam(user).pw_uid if user is not None else user
+            gid = grp.getgrnam(group).gr_gid if group is not None else group
+            if -1 not in [uid, gid] and None not in [uid, gid]:
+                os.chown(path, uid, gid)
+            if mode is not None:
+                p.chmod(mode)
+            p.write_bytes(data)
             logger.debug("New munge key set. Restarting munge daemon.")
             self.start()
         else:
