@@ -141,7 +141,11 @@ class SlurmServerCharm(ServiceCharm):
     @service_forced_update()
     def _slurm_controller_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Fired when new compute node is requesting slurm configuration."""
+        self.service_set_status_message("New client detected")
+        self.service_update_status()
         if self.unit.is_leader():
+            self.service_set_status_message("Serving slurm configuration")
+            self.service_update_status()
             i = self.slurm_controller_interface.select(self.app)
             i.nonce = self.__create_nonce()
             i.slurm_conf.load(self.slurm_server_manager.conf_file, checksum=True)
