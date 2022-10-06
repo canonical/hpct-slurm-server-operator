@@ -4,6 +4,7 @@
 
 """Interface for the slurm-controller relation."""
 
+from hpctinterfaces import interface_registry
 from hpctinterfaces.ext.file import FileDataInterface
 from hpctinterfaces.relation import AppBucketInterface, RelationSuperInterface
 from hpctinterfaces.value import String
@@ -22,3 +23,6 @@ class SlurmControllerSuperInterface(RelationSuperInterface):
 
         nonce = String("")
         slurm_conf = FileDataInterface()
+
+
+interface_registry.register("relation-slurm-controller", SlurmControllerSuperInterface)
