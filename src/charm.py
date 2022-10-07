@@ -130,8 +130,8 @@ class SlurmServerCharm(ServiceCharm):
             self.slurm_server_manager.generate_base_partition()
             self.slurm_server_manager.start()
 
-            out = self.slurm_controller_siface.select(self.app)
-            out.slurm_conf.load(self.slurm_server_manager.conf_file_path, checksum=True)
+            iface = self.slurm_controller_siface.select(self.app)
+            iface.slurm_conf.load(self.slurm_server_manager.conf_file_path, checksum=True)
         else:
             self.service_set_status_message("Leader registering new compute node")
             self.service_update_status()
