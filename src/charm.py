@@ -36,13 +36,11 @@ class SlurmServerCharm(ServiceCharm):
         self.slurm_server_manager = SlurmServerManager()
         self.munge_manager = MungeManager()
 
-        self.auth_munge_interface = interface_registry.load(
-            "relation-auth-munge", self, "auth-munge"
-        )
-        self.slurm_compute_interface = interface_registry.load(
+        self.auth_munge_siface = interface_registry.load("relation-auth-munge", self, "auth-munge")
+        self.slurm_compute_siface = interface_registry.load(
             "relation-slurm-compute", self, "slurm-compute"
         )
-        self.slurm_controller_interface = interface_registry.load(
+        self.slurm_controller_siface = interface_registry.load(
             "relation-slurm-controller", self, "slurm-controller"
         )
 
@@ -104,19 +102,19 @@ class SlurmServerCharm(ServiceCharm):
         if self.unit.is_leader():
             self.service_set_status_message("Authenticating new compute node")
             self.service_update_status()
-            i = self.auth_munge_interface.select(self.app)
+            iface = self.auth_munge_siface.select(self.app)
 
-            i.nonce = self.__create_nonce()
-            i.munge_key.load(self.munge_manager.key, checksum=True)
+            iface.nonce = self.__create_nonce()
+            iface.munge_key.load(self.munge_manager.key_file_path, checksum=True)
             self.service_set_status_message("Copy of munge key sent")
             self.service_update_status()
 
     @service_forced_update()
     def _slurm_compute_relation_changed(self, event: RelationChangedEvent) -> None:
         """Fired when compute node joins the cluster. Information is loaded from `event.unit`."""
-        i = self.slurm_compute_interface.select(event.unit)
+        iface = self.slurm_compute_siface.select(event.unit)
 
-        if i.nonce == "":
+        if iface.nonce == "":
             self.service_set_status_message("Compute node is not ready yet")
             self.service_update_status()
         elif self.unit.is_leader():
@@ -124,16 +122,16 @@ class SlurmServerCharm(ServiceCharm):
             self.service_update_status()
             self.slurm_server_manager.stop()
             self.slurm_server_manager.add_node(
-                nodename=i.hostname,
-                nodeaddr=i.ip_address,
-                cpus=i.cpu_count,
-                realmemory=i.free_memory,
+                nodename=iface.hostname,
+                nodeaddr=iface.ip_address,
+                cpus=iface.cpu_count,
+                realmemory=iface.free_memory,
             )
             self.slurm_server_manager.generate_base_partition()
             self.slurm_server_manager.start()
 
-            out = self.slurm_controller_interface.select(self.app)
-            out.slurm_conf.load(self.slurm_server_manager.conf_file, checksum=True)
+            out = self.slurm_controller_siface.select(self.app)
+            out.slurm_conf.load(self.slurm_server_manager.conf_file_path, checksum=True)
         else:
             self.service_set_status_message("Leader registering new compute node")
             self.service_update_status()
@@ -146,9 +144,9 @@ class SlurmServerCharm(ServiceCharm):
         if self.unit.is_leader():
             self.service_set_status_message("Serving slurm configuration")
             self.service_update_status()
-            i = self.slurm_controller_interface.select(self.app)
-            i.nonce = self.__create_nonce()
-            i.slurm_conf.load(self.slurm_server_manager.conf_file, checksum=True)
+            iface = self.slurm_controller_siface.select(self.app)
+            iface.nonce = self.__create_nonce()
+            iface.slurm_conf.load(self.slurm_server_manager.conf_file_path, checksum=True)
 
     def __create_nonce(self) -> str:
         """Create a nonce.
