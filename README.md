@@ -20,9 +20,23 @@ Assuming a `hpct-xxx-principal-operator` has been deployed:
 juju relate hpct-slurm-server-operator hpct-xxx-principal-operator
 ```
 
+Assuming a `hpct-slurm-client-operator` has been deployed:
+
+```
+juju relate
+juju relate 
+juju relate 
+```
+
 ## Relations
 
+`auth-munge` - a provides relation used to serve the primary slurm server's munge key to slurm clients.
+
 `slurm-server-ready` - a requires relation used to connect to a principal charm that provides the relation.
+
+`slurm-compute` - a requires relation used to consume unit information served by slurm clients.
+
+`slurm-controller` - a provides relation used to serve slurm configuration information to slurm clients.
 
 ## Contributing
 
