@@ -19,11 +19,11 @@ provides:
     interface: auth-munge
 
   slurm-controller:
-    interface: controller
+    interface: slurm-controller
 
 requires:
   slurm-compute:
-    interface: compute
+    interface: slurm-compute
 
   slurm-server-ready:
     interface: subordinate-ready
