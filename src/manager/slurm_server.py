@@ -142,7 +142,7 @@ class SlurmServerManager:
         try:
             logger.debug("Installing SLURM Central Management Daemon (slurmctld).")
             apt.add_package("slurmctld")
-        except apt.PackageError or apt.PackageNotFoundError as e:
+        except (apt.PackageError, apt.PackageNotFoundError) as e:
             logger.error(f"Error installing slurmctld. Reason: {e.message}.")
             raise SlurmServerManagerError("Failed to install slurmctld.")
         finally:
