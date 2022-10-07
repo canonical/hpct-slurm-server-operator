@@ -11,7 +11,6 @@ from typing import Union
 
 import charms.operator_libs_linux.v0.apt as apt
 from charms.operator_libs_linux.v1.systemd import (
-    service_restart,
     service_running,
     service_start,
     service_stop,
@@ -34,7 +33,7 @@ class SlurmServerManager:
     def __init__(self) -> None:
         self.__network = Network()
 
-        self.conf_file = "/etc/slurm/slurm.conf"
+        self.conf_file_path = "/etc/slurm/slurm.conf"
         self.hostname = self.__network.info["hostname"]
         for iface in self.__network.info["ifaces"]:
             if iface["name"] == "eth0":
@@ -42,18 +41,19 @@ class SlurmServerManager:
                     if addr["family"] == "inet":
                         self.ipv4_address = addr["address"]
 
-    def get_hash(self, file: Union[str, None] = None) -> Union[str, None]:
+    def get_hash(self, path: Union[str, None] = None) -> Union[str, None]:
         """Get the sha224 hash of a file.
 
         Args:
-            str | None: File to hash. Defaults to self.conf_file if file is None.
+            path (str | None): Path to file to hash.
+            Defaults to `self.conf_file_path` if path is None.
 
         Returns:
             str: sha224 hash of the file, or None if file does not exist.
         """
-        file = self.conf_file if file is None else file
+        path = self.conf_file_path if path is None else path
         return (
-            hashlib.sha224(open(file, "rb").read()).hexdigest() if os.path.isfile(file) else None
+            hashlib.sha224(open(path, "rb").read()).hexdigest() if os.path.isfile(path) else None
         )
 
     def generate_new_conf(self) -> None:
@@ -90,7 +90,7 @@ class SlurmServerManager:
 
     def generate_base_partition(self) -> None:
         """Generation a base partition using automatically discovered nodes."""
-        conf = [line.strip() for line in open(self.conf_file)]
+        conf = [line.strip() for line in open(self.conf_file_path)]
 
         node_list = set()
         for entry in conf:
@@ -107,7 +107,7 @@ class SlurmServerManager:
             f"PartitionName=base Nodes={','.join(node_list)} MaxNodes={len(node_list)} State=UP"
         )
 
-        open(self.conf_file, "w").close()
+        open(self.conf_file_path, "w").close()
         editor = SlurmConfFileEditor()
         editor.load()
         editor.add_lines(conf)
@@ -142,11 +142,8 @@ class SlurmServerManager:
         try:
             logger.debug("Installing SLURM Central Management Daemon (slurmctld).")
             apt.add_package("slurmctld")
-        except apt.PackageNotFoundError:
-            logger.error("Could not install slurmctld. Not found in package cache.")
-            raise SlurmServerManagerError("Failed to install slurmctld.")
-        except apt.PackageError as e:
-            logger.error(f"Could not install slurmctld. Reason: {e.message}.")
+        except apt.PackageError or apt.PackageNotFoundError as e:
+            logger.error(f"Error installing slurmctld. Reason: {e.message}.")
             raise SlurmServerManagerError("Failed to install slurmctld.")
         finally:
             logger.debug("slurmctld installed.")
@@ -191,7 +188,8 @@ class SlurmServerManager:
         """
         if self.__is_installed():
             logger.debug("Restarting slurmctld service.")
-            service_restart("slurmctld")
+            self.stop()
+            self.start()
             logger.debug("slurmctld service restarted.")
         else:
             raise SlurmServerManagerError("slurmctld is not installed.")
