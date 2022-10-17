@@ -23,9 +23,9 @@ juju relate hpct-slurm-server-operator hpct-xxx-principal-operator
 Assuming a `hpct-slurm-client-operator` has been deployed:
 
 ```
-juju relate
-juju relate 
-juju relate 
+juju relate slurm-server:auth-munge slurm-client:auth-munge
+juju relate slurm-server:slurm-controller slurm-client:slurm-controller
+juju relate slurm-server:slurm-compute slurm-client:slurm-compute
 ```
 
 ## Relations
