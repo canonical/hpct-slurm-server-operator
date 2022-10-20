@@ -9,30 +9,23 @@ import logging
 import os
 from typing import Union
 
-import charms.operator_libs_linux.v0.apt as apt
-from charms.operator_libs_linux.v1.systemd import (
-    service_running,
-    service_start,
-    service_stop,
-)
 from hpcteditors.app.slurm import SlurmConfFileEditor
+from hpctmanagers import ManagerException
+from hpctmanagers.ubuntu import UbuntuManager
 from sysprober.network import Network
 
 logger = logging.getLogger(__name__)
 
 
-class SlurmServerManagerError(Exception):
-    """Raised when the slurm server manager encounters an error."""
-
-    ...
-
-
-class SlurmServerManager:
+class SlurmServerManager(UbuntuManager):
     """Top-level manager class for controlling slurmctld on unit."""
 
-    def __init__(self) -> None:
-        self.__network = Network()
+    install_packages = ["slurmctld"]
+    systemd_services = ["slurmctld"]
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.__network = Network()
         self.conf_file_path = "/etc/slurm/slurm.conf"
         self.hostname = self.__network.info["hostname"]
         for iface in self.__network.info["ifaces"]:
@@ -117,14 +110,14 @@ class SlurmServerManager:
         """Add a new node to the slurm configuration file.
 
         Raises:
-            SlurmServerManagerError: Thrown if a bad configuration is received from a node.
+            ManagerException: Thrown if a bad configuration is received from a node.
         """
         nodename = kwargs.get("nodename", None)
         nodeaddr = kwargs.get("nodeaddr", None)
         cpus = kwargs.get("cpus", None)
         realmemory = kwargs.get("realmemory", None)
         if None in [nodename, nodeaddr, cpus, realmemory]:
-            raise SlurmServerManagerError("Invalid node configuration received.")
+            raise ManagerException("Invalid node configuration received.")
 
         editor = SlurmConfFileEditor()
         editor.load()
@@ -133,71 +126,16 @@ class SlurmServerManager:
         )
         editor.dump()
 
-    def install(self) -> None:
-        """Install SLURM central management daemon.
-
-        Raises:
-            SlurmServerManagerError: Thrown if slurmctld fails to install.
-        """
-        try:
-            logger.debug("Installing SLURM Central Management Daemon (slurmctld).")
-            apt.add_package("slurmctld")
-        except (apt.PackageError, apt.PackageNotFoundError) as e:
-            logger.error(f"Error installing slurmctld. Reason: {e.message}.")
-            raise SlurmServerManagerError("Failed to install slurmctld.")
-        finally:
-            logger.debug("slurmctld installed.")
-
-    def start(self) -> None:
-        """Start SLURM central management daemon.
-
-        Raises:
-            SlurmServerManagerError: Thrown if slurmctld is not installed on unit.
-        """
-        if self.__is_installed():
-            logger.debug("Starting slurmctld service.")
-            if not service_running("slurmctld"):
-                service_start("slurmctld")
-                logger.debug("slurmctld service started.")
-            else:
-                logger.debug("slurmctld service is already running.")
-        else:
-            raise SlurmServerManagerError("slurmctld is not installed.")
-
-    def stop(self) -> None:
-        """Stop SLURM central management daemon.
-
-        Raises:
-            SlurmServerManagerError: Thrown if slurmctld is not installed on unit.
-        """
-        if self.__is_installed():
-            logger.debug("Stopping slurmctld service.")
-            if service_running("slurmctld"):
-                service_stop("slurmctld")
-                logger.debug("slurmctld service stopped.")
-            else:
-                logger.debug("slurmctld service is already stopped.")
-        else:
-            raise SlurmServerManagerError("slurmctld is not installed.")
-
     def restart(self) -> None:
         """Restart SLURM central management daemon.
 
         Raises:
-            SlurmServerManagerError: Thrown if slurmctld is not installed on unit.
+            ManagerException: Thrown if slurmctld is not installed on unit.
         """
-        if self.__is_installed():
+        if self.is_installed():
             logger.debug("Restarting slurmctld service.")
             self.stop()
             self.start()
             logger.debug("slurmctld service restarted.")
         else:
-            raise SlurmServerManagerError("slurmctld is not installed.")
-
-    def __is_installed(self) -> bool:
-        """Internal function to check if slurmctld Debian package is installed on the unit.
-
-        Returns:
-            bool: True if Debian package is present; False if Debian package is not present.
-        """
-        return True if apt.DebianPackage.from_installed_package("slurmctld").present else False
+            raise ManagerException("slurmctld is not installed.")

@@ -43,6 +43,9 @@ class SlurmServerCharm(ServiceCharm):
         self.slurm_controller_siface = interface_registry.load(
             "relation-slurm-controller", self, "slurm-controller"
         )
+        self.ready_siface = interface_registry.load(
+            "relation-subordinate-ready", self, "slurm-server-ready"
+        )
 
         self.framework.observe(
             self.on.auth_munge_relation_joined, self._auth_munge_relation_joined
@@ -53,6 +56,8 @@ class SlurmServerCharm(ServiceCharm):
         self.framework.observe(
             self.on.slurm_controller_relation_joined, self._slurm_controller_relation_joined
         )
+
+        self.service_init_sync("slurm-server-ready", False, self.__sync_handler)
 
     @service_forced_update()
     def _service_install(self, event: InstallEvent) -> None:
@@ -80,6 +85,7 @@ class SlurmServerCharm(ServiceCharm):
         self.service_update_status()
         self.slurm_server_manager.start()
 
+        self.service_set_sync("slurm-server-ready", True)
         self.service_set_status_message()
         self.service_update_status()
 
@@ -99,6 +105,7 @@ class SlurmServerCharm(ServiceCharm):
 
     @service_forced_update()
     def _auth_munge_relation_joined(self, event: RelationJoinedEvent) -> None:
+        """Fired when new client joins the auth-munge relation."""
         if self.unit.is_leader():
             self.service_set_status_message("Authenticating new compute node")
             self.service_update_status()
@@ -138,9 +145,10 @@ class SlurmServerCharm(ServiceCharm):
 
     @service_forced_update()
     def _slurm_controller_relation_joined(self, event: RelationJoinedEvent) -> None:
-        """Fired when new compute node is requesting slurm configuration."""
+        """Fired when new client joins the slurm-controller relation."""
         self.service_set_status_message("New client detected")
         self.service_update_status()
+
         if self.unit.is_leader():
             self.service_set_status_message("Serving slurm configuration")
             self.service_update_status()
@@ -155,6 +163,16 @@ class SlurmServerCharm(ServiceCharm):
             str: Created nonce.
         """
         return secrets.token_urlsafe()
+
+    def __sync_handler(self, key: str, value: bool) -> None:
+        """Custom sync event handling when setting sync status.
+
+        Args:
+            key (str): Key to update.
+            value (bool): Boolean value to set.
+        """
+        if key == "slurm-server-ready":
+            self.ready_siface.select(self.unit).status = self.service_get_sync(key)
 
 
 if __name__ == "__main__":
