@@ -57,9 +57,6 @@ class SlurmServerCharm(ServiceCharm):
             self.on.slurm_controller_relation_joined, self._slurm_controller_relation_joined
         )
 
-        self.service_init_sync("auth-munge", False)
-        self.service_init_sync("slurm-compute", False)
-        self.service_init_sync("slurm-controller", False)
         self.service_init_sync("slurm-server-ready", False, self.__sync_handler)
 
     @service_forced_update()
@@ -109,8 +106,6 @@ class SlurmServerCharm(ServiceCharm):
     @service_forced_update()
     def _auth_munge_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Fired when new client joins the auth-munge relation."""
-        self.service_set_sync("auth-munge", False)
-
         if self.unit.is_leader():
             self.service_set_status_message("Authenticating new compute node")
             self.service_update_status()
@@ -121,12 +116,9 @@ class SlurmServerCharm(ServiceCharm):
             self.service_set_status_message("Copy of munge key sent")
             self.service_update_status()
 
-        self.service_set_sync("auth-munge", True)
-
     @service_forced_update()
     def _slurm_compute_relation_changed(self, event: RelationChangedEvent) -> None:
         """Fired when compute node joins the cluster. Information is loaded from `event.unit`."""
-        self.service_set_sync("slurm-compute", False)
         iface = self.slurm_compute_siface.select(event.unit)
 
         if iface.nonce == "":
@@ -151,12 +143,9 @@ class SlurmServerCharm(ServiceCharm):
             self.service_set_status_message("Leader registering new compute node")
             self.service_update_status()
 
-        self.service_set_sync("slurm-compute", True)
-
     @service_forced_update()
     def _slurm_controller_relation_joined(self, event: RelationJoinedEvent) -> None:
         """Fired when new client joins the slurm-controller relation."""
-        self.service_set_sync("slurm-controller", False)
         self.service_set_status_message("New client detected")
         self.service_update_status()
 
@@ -166,8 +155,6 @@ class SlurmServerCharm(ServiceCharm):
             iface = self.slurm_controller_siface.select(self.app)
             iface.nonce = self.__create_nonce()
             iface.slurm_conf.load(self.slurm_server_manager.conf_file_path, checksum=True)
-
-        self.service_set_sync("slurm-controller", True)
 
     def __create_nonce(self) -> str:
         """Create a nonce.
